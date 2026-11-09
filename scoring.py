@@ -51,12 +51,18 @@ def combine_signals(model_score: float, style_score: float) -> float:
 
     The weights in config.py are placeholders. Change them, or ignore them and
     write a different rule.
+
+    Decision: keep false positives (humans labelled AI) unlikely. Whichever
+    signal reads MORE human gets 0.65 of the vote, the other 0.35. So:
+      - both high (0.75, 0.73)  -> 0.74, still AI: they agree.
+      - they split (0.9, 0.1)   -> 0.38, unsure: never a confident AI label
+        on the word of one signal.
+      - both low                -> human.
+    The cost: AI text that fools just one signal slips toward unsure.
     """
-    # TODO: replace this
-    return (
-        config.WEIGHT_MODEL_SIGNAL * model_score
-        + config.WEIGHT_STYLE_SIGNAL * style_score
-    )
+    lower = min(model_score, style_score)
+    higher = max(model_score, style_score)
+    return config.WEIGHT_LOWER_SIGNAL * lower + config.WEIGHT_HIGHER_SIGNAL * higher
 
 
 def score_to_label(score: float) -> tuple[str, str]:

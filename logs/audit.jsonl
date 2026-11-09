@@ -1,0 +1,3 @@
+{"timestamp": "2026-10-29T00:57:56+00:00", "content_id": "c_bdd9324b153c", "creator_id": "demo_instructor", "guess": null, "model_score": 0.7544, "style_score": null, "combined_score": null, "label": null, "status": "decided"}
+{"timestamp": "2026-10-29T20:32:50+00:00", "content_id": "c_021e41e8f9f7", "creator_id": "demo_instructor", "guess": null, "model_score": 0.7544, "style_score": null, "combined_score": null, "label": null, "status": "decided"}
+{"timestamp": "2026-11-09T09:55:38+00:00", "content_id": "c_be5c7f2ded1e", "creator_id": "demo_instructor", "guess": "unsure", "model_score": 0.7544, "style_score": null, "combined_score": null, "label": null, "status": "decided"}

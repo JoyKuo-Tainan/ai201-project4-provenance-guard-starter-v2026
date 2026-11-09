@@ -54,8 +54,11 @@ DETECTOR_MAX_TOKENS = 400
 # down BEFORE you code it, and to put the numbers in your README. Whatever you
 # decide, it goes here.
 
-WEIGHT_MODEL_SIGNAL = 0.5
-WEIGHT_STYLE_SIGNAL = 0.5
+# My rule weights by which signal reads more human, not by which signal it is:
+# the lower (more human) score gets the bigger vote, so a wrong accusation
+# needs BOTH signals to agree. See scoring.combine_signals.
+WEIGHT_LOWER_SIGNAL = 0.65
+WEIGHT_HIGHER_SIGNAL = 0.35
 
 
 # ─── Thresholds (Milestone 5) ────────────────────────────────────────────────

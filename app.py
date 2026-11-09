@@ -7,8 +7,8 @@ Provenance Guard — the web service.
 Then, in another terminal:
 
     curl -X POST http://127.0.0.1:5000/ping \
-      -H "Content-Type: application/json" \
-      -d '{"message": "hello"}'
+    -H "Content-Type: application/json" \
+    -d '{"message": "hello"}'
 
 That's the example route. It works right now, before you've written anything.
 **Leave it alone** — it's your control. When something breaks later, check that
@@ -162,7 +162,7 @@ def submit():
 
     Should return JSON with, at minimum:
         {"content_id": "...", "guess": "...", "confidence": 0.0, "label": "...",
-         "model_score": 0.0, "style_score": 0.0}
+        "model_score": 0.0, "style_score": 0.0}
 
     ⚠️ **Both signal scores go in the response, not just the log.** Unit 8's
     `run_attacks.py` and `run_eval.py` read `model_score` and `style_score`
@@ -176,40 +176,68 @@ def submit():
     a broken route from a broken signal.
 
     **Milestone 3 — the route answers.**
-      1. Return a hardcoded response. Confirm `curl` gets it back before you
-         add any logic at all.
-      2. Then pull `text` and `creator_id` out of the payload.
-      3. Then call ONE signal — `detector.model_signal(text)` — and put the
-         real number in. Leave confidence and label as placeholders.
-      4. Log every submission with `audit.log_decision(...)`. The content_id
-         matters: `/appeal` needs it, and a student who skips it rebuilds this
-         whole flow later.
+    1. Return a hardcoded response. Confirm `curl` gets it back before you
+        add any logic at all.
+    2. Then pull `text` and `creator_id` out of the payload.
+    3. Then call ONE signal — `detector.model_signal(text)` — and put the
+        real number in. Leave confidence and label as placeholders.
+    4. Log every submission with `audit.log_decision(...)`. The content_id
+        matters: `/appeal` needs it, and a student who skips it rebuilds this
+        whole flow later.
 
     **Milestone 4 — the second signal and the score.**
-      5. Add `stylometry.style_signal(text)`.
-      6. Combine them with `scoring.combine_signals(...)`.
-      7. Log BOTH signal scores alongside the combined one, and put them in the
-         response too. Next unit you can't diagnose anything without them.
+        5. Add `stylometry.style_signal(text)`.
+        6. Combine them with `scoring.combine_signals(...)`.
+        7. Log BOTH signal scores alongside the combined one, and put them in the
+            response too. Next unit you can't diagnose anything without them.
 
     **Milestone 5 — the label.**
-      8. `scoring.score_to_label(...)` and put the real label in the response.
+        8. `scoring.score_to_label(...)` and put the real label in the response.
 
     ─────────────────────────────────────────────────────────────────────────
     Worth deciding early, because unit 8's attack set will decide it for you:
     what should this do when `text` is missing, empty, or enormous? A crash on
     a malformed input is one of the most common real failures there is.
     """
-    payload = request.get_json(silent=True) or {}
+    # curl -X POST http://127.0.0.1:5000/submit -H "Content-Type: application/json" -d @samples/clearly_ai.json
 
-    # TODO: delete this and build the route.
+    payload = request.get_json(silent=True) or {}
+    text = payload.get("text")
+    creator_id = payload.get("creator_id", "unknown")
+
+    # Step 2 - Json goes in: check text BEFORE the model sees it, so bad
+    # input gets a 400 instead of crashing the detector.
+    if not isinstance(text, str) or not text.strip():
+        return jsonify({"error": "bad_request", "message": "Send JSON with a non-empty \"text\"."}), 400
+
+    # Step 3 - one real signal that we first tested from the terminal
+    # python detector.py "some text"
+    import detector
+    model_score = detector.model_signal(text)
+
+    # Step 4 - log the decision. The content_id is what /appeal needs later.
+    content_id = f"c_{uuid.uuid4().hex[:12]}"
+    guess = "unsure"  # placeholder until Milestone 5
+    audit.log_decision(
+        content_id=content_id,
+        creator_id=creator_id,
+        guess=guess,
+        model_score=model_score,
+        status="decided",
+    )
+
+    # Step 1 - the route answers. confidence and label are still placeholders.
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /submit isn't built yet — see the TODO in app.py.",
-        "you_sent": {
-            "text_length": len(payload.get("text", "")),
-            "creator_id": payload.get("creator_id"),
-        },
-    }), 501
+        "content_id": content_id,
+        "creator_id": creator_id,
+        "guess": guess,
+        "confidence": 0.5,
+        "label": "not built yet",
+        "model_score": model_score,
+        "style_score": None,
+        }), 200
+
+
 
 
 @app.post("/appeal")
@@ -221,12 +249,12 @@ def appeal():
         {"content_id": "...", "reasoning": "..."}
 
     Should:
-      1. Check the content_id actually exists — `audit.entries_for(id)` tells
-         you. A typo here fails silently and looks like a broken endpoint,
-         which is the single most common way this milestone eats an hour.
-      2. Record the appeal with `audit.log_appeal(...)`, which moves the item
-         to `under_review`.
-      3. Confirm to the writer. No automatic re-checking needed.
+    1. Check the content_id actually exists — `audit.entries_for(id)` tells
+        you. A typo here fails silently and looks like a broken endpoint,
+        which is the single most common way this milestone eats an hour.
+    2. Record the appeal with `audit.log_appeal(...)`, which moves the item
+        to `under_review`.
+    3. Confirm to the writer. No automatic re-checking needed.
 
     This is the smallest endpoint in the project and the one that matters most
     to the person on the other end. It's the only thing standing between a
