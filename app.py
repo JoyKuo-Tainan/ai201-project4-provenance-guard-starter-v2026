@@ -215,26 +215,37 @@ def submit():
     import detector
     model_score = detector.model_signal(text)
 
-    # Step 4 - log the decision. The content_id is what /appeal needs later.
+    # Step 5 - the second signal, and Step 6 - combine them into one score.
+    import scoring
+    import stylometry
+    style_score = round(stylometry.style_signal(text), 4)
+    combined_score = round(scoring.combine_signals(model_score, style_score), 4)
+
+    # Step 4/7 - log the decision with BOTH signal scores and the combined one.
+    # The content_id is what /appeal needs later.
     content_id = f"c_{uuid.uuid4().hex[:12]}"
-    guess = "unsure"  # placeholder until Milestone 5
+
+    # Step 8 - turn the combined score into the sentence a writer reads.
+    guess, label = scoring.score_to_label(combined_score)
     audit.log_decision(
         content_id=content_id,
         creator_id=creator_id,
         guess=guess,
         model_score=model_score,
+        style_score=style_score,
+        combined_score=combined_score,
+        label=label,
         status="decided",
     )
 
-    # Step 1 - the route answers. confidence and label are still placeholders.
     return jsonify({
         "content_id": content_id,
         "creator_id": creator_id,
         "guess": guess,
-        "confidence": 0.5,
-        "label": "not built yet",
+        "confidence": combined_score,
+        "label": label,
         "model_score": model_score,
-        "style_score": None,
+        "style_score": style_score,
         }), 200
 
 
@@ -260,14 +271,32 @@ def appeal():
     to the person on the other end. It's the only thing standing between a
     wrong accusation and nothing at all.
     """
-    payload = request.get_json(silent=True) or {}
+    # curl -X POST http://127.0.0.1:5000/appeal -H "Content-Type: application/json" -d '{"content_id": "c_...", "reasoning": "I wrote this myself."}'
 
-    # TODO: delete this and build the route.
+    payload = request.get_json(silent=True) or {}
+    content_id = payload.get("content_id")
+    reasoning = payload.get("reasoning")
+
+    if not isinstance(content_id, str) or not content_id.strip():
+        return jsonify({"error": "bad_request", "message": "Send JSON with the \"content_id\" from your submission."}), 400
+    if not isinstance(reasoning, str) or not reasoning.strip():
+        return jsonify({"error": "bad_request", "message": "Tell us why you think the label is wrong in \"reasoning\"."}), 400
+
+    # Step 1 - the content_id has to exist, or the appeal would vanish silently.
+    entries = audit.entries_for(content_id)
+    if not entries:
+        return jsonify({"error": "not_found", "message": f"No submission found with content_id {content_id!r}."}), 404
+
+    # Step 2 - record the appeal next to the original decision; status -> under_review.
+    creator_id = entries[0].get("creator_id", "unknown")
+    audit.log_appeal(content_id=content_id, creator_id=creator_id, reasoning=reasoning)
+
+    # Step 3 - confirm to the writer.
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /appeal isn't built yet — see the TODO in app.py.",
-        "you_sent": payload,
-    }), 501
+        "content_id": content_id,
+        "status": "under_review",
+        "message": "Thanks. Your appeal has been recorded and a person will review this decision.",
+    }), 200
 
 
 # ── Already works ─────────────────────────────────────────────────────────────
