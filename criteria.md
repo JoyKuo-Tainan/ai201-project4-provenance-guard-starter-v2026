@@ -42,55 +42,55 @@ Two things worth knowing before you pick numbers:
   a **miss**.
 
 ---
-## 1.
+## 1. **False positives.**
 
 <!-- Your criterion. It must name a number. -->
 
-**False positives.** Of 10 pieces of human writing (at least 3 of them plainly written: short sentences, common words, few commas), **at most 1** is labelled high-confidence AI, in **each** of the three trials.
+Of 10 pieces of human writing (at least 3 of them plainly written: short sentences, common words, few commas), **at most 1** is labelled high-confidence AI, in **each** of the three trials.
 
 **Why this target:** A wrong accusation costs the writer far more than a missed detection costs the site, so this is the criterion I care about most. I include plainly written pieces on purpose. Both of my signals misread plain writing the same way, so a test set of only lively, comma-heavy human writing would make this target too easy to pass.
 
 
 ---
 
-## 2.
+## 2. **Score spread.**
 
 <!-- Your criterion. -->
 
-**Score spread.** Across 5 clearly-AI and 5 clearly-human texts, the **lowest** clearly-AI combined score is above the **highest** clearly-human combined score (no overlap), and the two group averages are **at least 0.35 apart**, in each of the three trials.
+ Across 5 clearly-AI and 5 clearly-human texts, the **lowest** clearly-AI combined score is above the **highest** clearly-human combined score (no overlap), and the two group averages are **at least 0.35 apart**, in each of the three trials.
 
 **Why this target:** 0.35 is the width of my unsure band (0.35 to 0.65). If the clear cases aren't separated by at least that much, they can't land on opposite sides of it, and the labels would be deciding by luck. "No overlap" stops one good average from hiding a clearly-human text that scores like AI.
 
 
 ---
 
-## 3.
+## 3. **Label coverage.**
 
 <!-- Your criterion. -->
 
-**Label coverage.** All three labels (high-confidence human, unsure and high-confidence AI) are produced by **real submitted text** in each of the three trials. At least 1 submission lands on each label, and of 5 lightly-edited AI texts, **at least 3** land on unsure or AI rather than human.
+ All three labels (high-confidence human, unsure and high-confidence AI) are produced by **real submitted text** in each of the three trials. At least 1 submission lands on each label, and of 5 lightly-edited AI texts, **at least 3** land on unsure or AI rather than human.
 
 **Why this target:** A label that no real text can reach is a gap in the ranges, and the combined score can only land between the two signals, so this has to be shown with real text, not assumed. The lightly-edited cases check that "unsure" actually does its job of catching the in-between cases, rather than only being reachable in theory.
 
 
 ---
 
-## 4.
+## 4. **The appeal path.** 
 
 <!-- Your criterion. -->
 
-**The appeal path.** **10 of 10** appeals with a valid `content_id` return a confirmation, move the item to `under_review`, and add an appeal entry to the audit log. **5 of 5** appeals with an unknown or missing `content_id` return a 4xx error and change nothing.
+**10 of 10** appeals with a valid `content_id` return a confirmation, move the item to `under_review`, and add an appeal entry to the audit log. **5 of 5** appeals with an unknown or missing `content_id` return a 4xx error and change nothing.
 
 **Why this target:** The appeal is the only thing standing between a wrong accusation and nothing at all, so anything below 100% means some writer was silently ignored. This part has no model in it, so it should behave the same every time and there's no reason to allow misses. The unknown-ID half matters because a typo that "succeeds" without being recorded looks like a working appeal that nobody will ever read.
 
 
 ---
 
-## 5.
+## 5. **Bad input.** 
 
 <!-- Your criterion. -->
 
-**Bad input.** Of these 7 inputs, **0** return a 500 or crash the service: no JSON body, `text` missing, `text` empty, `text` only whitespace, `text` not a string, `text` of one or two words, and `text` over 20,000 characters. Each gets a 4xx with a JSON `error` message within 10 seconds, in each of the three trials.
+Of these 7 inputs, **0** return a 500 or crash the service: no JSON body, `text` missing, `text` empty, `text` only whitespace, `text` not a string, `text` of one or two words, and `text` over 20,000 characters. Each gets a 4xx with a JSON `error` message within 10 seconds, in each of the three trials.
 
 **Why this target:** A crash on malformed input is one of the most common real failures, and unit 8's attack set will send all of these. The one-or-two-word case is real for my service, because the detector raises an error on text under 3 tokens and my style signal can't measure spread in under two sentences. 20,000 characters is about 3,000 words, longer than any essay a writer would reasonably check, and it keeps one request from tying up the model.
 

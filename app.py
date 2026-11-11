@@ -151,7 +151,7 @@ def health():
 # ── YOU BUILD THIS ────────────────────────────────────────────────────────────
 
 @app.post("/submit")
-# @limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute;{config.RATE_LIMIT_PER_DAY}/day")
+@limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute;{config.RATE_LIMIT_PER_DAY}/day")
 def submit():
     """
     Take a piece of text, decide about it, log the decision, answer.
@@ -201,23 +201,51 @@ def submit():
     """
     # curl -X POST http://127.0.0.1:5000/submit -H "Content-Type: application/json" -d @samples/clearly_ai.json
 
-    payload = request.get_json(silent=True) or {}
+    # Step 2 - check the input BEFORE either signal sees it. (Unit 8 improvement.)
+    # Diagnosis Pattern D: the route only checked "non-empty string", so a list
+    # body, a 1-character text and a non-string creator_id got through.
+    # Diagnosis Pattern B: text the style signal can't measure (fewer than two
+    # sentences, no English words) was scored as maximum AI instead of refused.
+    import stylometry
+
+    def bad_request(message):
+        return jsonify({"error": "bad_request", "message": message}), 400
+
+    payload = request.get_json(silent=True)
+    if payload is None:
+        payload = {}
+    if not isinstance(payload, dict):
+        return bad_request("Send a JSON object like {\"text\": \"...\", \"creator_id\": \"...\"}.")
+
     text = payload.get("text")
     creator_id = payload.get("creator_id", "unknown")
 
-    # Step 2 - Json goes in: check text BEFORE the model sees it, so bad
-    # input gets a 400 instead of crashing the detector.
+    if not isinstance(creator_id, str) or not creator_id.strip():
+        return bad_request("\"creator_id\" must be a non-empty string.")
     if not isinstance(text, str) or not text.strip():
-        return jsonify({"error": "bad_request", "message": "Send JSON with a non-empty \"text\"."}), 400
+        return bad_request("Send JSON with a non-empty \"text\".")
+    if len(text) > config.MAX_TEXT_CHARS:
+        return bad_request(
+            f"Text is too long to check — the limit is {config.MAX_TEXT_CHARS:,} characters."
+        )
+    if (len(stylometry.words(text)) < config.MIN_WORDS
+            or len(stylometry.sentences(text)) < config.MIN_SENTENCES):
+        return bad_request(
+            f"We can't check this — it needs at least {config.MIN_WORDS} words of "
+            f"English across {config.MIN_SENTENCES} or more sentences. This is not "
+            f"a finding about your writing; our checks only work on English prose."
+        )
 
     # Step 3 - one real signal that we first tested from the terminal
     # python detector.py "some text"
     import detector
-    model_score = detector.model_signal(text)
+    try:
+        model_score = detector.model_signal(text)
+    except ValueError as exc:  # the detector refuses text under 3 tokens
+        return bad_request(str(exc))
 
     # Step 5 - the second signal, and Step 6 - combine them into one score.
     import scoring
-    import stylometry
     style_score = round(stylometry.style_signal(text), 4)
     combined_score = round(scoring.combine_signals(model_score, style_score), 4)
 

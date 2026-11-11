@@ -74,6 +74,18 @@ WEIGHT_HIGHER_SIGNAL = 0.35
 # getting through. There is no setting that avoids the trade — only settings
 # that decide who pays for it.
 
+# ─── Input limits (unit 8 improvement) ───────────────────────────────────────
+# Checked in app.py::submit before either signal runs. Text the signals can't
+# measure is refused with a 400 rather than scored.
+#   MIN_SENTENCES: the style signal's spread needs two sentences; with one it
+#     returns 0 spread, which it reads as maximum AI.
+#   MIN_WORDS: counted with stylometry.words (English letters and digits), so
+#     emoji, punctuation-only and non-Latin scripts are refused, not accused.
+#   MAX_TEXT_CHARS: criterion 5's limit; the detector only reads ~400 tokens.
+MIN_WORDS = 20
+MIN_SENTENCES = 2
+MAX_TEXT_CHARS = 20_000
+
 HUMAN_THRESHOLD = 0.35
 AI_THRESHOLD = 0.65
 
@@ -95,10 +107,11 @@ AI_THRESHOLD = 0.65
 # an hour, and a script sending a thousand variations to map your thresholds.
 # Your README has to say why your numbers and not others.
 
-RATE_LIMITING_ENABLED = os.getenv("AI201_RATE_LIMITS", "0") == "1"
+# RATE_LIMITING_ENABLED = os.getenv("AI201_RATE_LIMITS", "0") == "1"
+RATE_LIMITING_ENABLED = True
 
-RATE_LIMIT_PER_MINUTE = 10
-RATE_LIMIT_PER_DAY = 200
+RATE_LIMIT_PER_MINUTE = 5
+RATE_LIMIT_PER_DAY = 50
 
 # Flask-Limiter warns loudly without this. In-memory is right for one laptop
 # and wrong for anything real — a restart forgets every count, and two copies
